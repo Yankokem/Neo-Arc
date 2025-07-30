@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet');
+@import url('https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js');
+
+:root {
+  font-family: "Montserrat", sans-serif;
+  background-color: #eeeeee;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+/*
+#CA9335
+#5f410d
+#eeeeee
+*/
