@@ -1,10 +1,11 @@
 <script>
-    import Navbar from './components/Navbar.svelte';
     import Footer from './components/Footer.svelte';
-    import Home from './pages/Home.svelte';
-    import Gadgets from './pages/Gadgets.svelte';
-    import ComputerHardware from './pages/ComputerHardware.svelte';
+    import Navbar from './components/Navbar.svelte';
     import AllProducts from './pages/AllProducts.svelte';
+    import Cart from './pages/Cart.svelte';
+    import ComputerHardware from './pages/ComputerHardware.svelte';
+    import Gadgets from './pages/Gadgets.svelte';
+    import Home from './pages/Home.svelte';
     
     // Track current page
     let currentPage = window.location.hash.substring(1) || 'home';
@@ -26,6 +27,8 @@
             <ComputerHardware />
         {:else if currentPage === 'all-products'}
             <AllProducts />
+        {:else if currentPage === 'cart'}
+            <Cart />
         {/if}
     </main>
     <Footer />
@@ -33,6 +36,7 @@
 
 <style>
     .app-container {
+        /* border: 2px solid red; */
         max-width: 1440px;
         margin: 20px auto 0 auto;
         display: flex;

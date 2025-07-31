@@ -25,6 +25,7 @@
 
 <style>
     .product-layout {
+        /* border: 2px solid blue; */
         display: grid;
         grid-template-columns: 350px 1fr;
         gap: 2rem;
@@ -32,16 +33,17 @@
     }
 
     .filter-column {
+        /* border: 2px solid blue; */
         position: sticky;
         top: 20px;
         height: fit-content;
     }
 
     .product-column {
+        /* border: 2px solid blue; */
         padding: 1rem;
     }
 
-    /* Responsive adjustments */
     @media (max-width: 768px) {
         .product-layout {
             grid-template-columns: 1fr;
