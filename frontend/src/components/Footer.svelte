@@ -44,7 +44,7 @@
             font-weight: bold;
         }
         p{
-            color: #5f410d;
+            color: #4B5563;
         }
     }
 </style>

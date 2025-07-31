@@ -248,14 +248,6 @@
     .sidebar {
         color: #CA9335;
     }
-    
-    .product-card {
-        transition: transform 0.2s;
-    }
-    
-    .product-card:hover {
-        transform: translateY(-5px);
-    }
 
     .gadgets-button {
         border: 2px solid #CA9335;

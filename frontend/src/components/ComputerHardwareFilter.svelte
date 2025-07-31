@@ -1,7 +1,9 @@
 <script>
     import { fade } from 'svelte/transition';
+    import { onMount } from 'svelte';
 
-    // State for filters
+    export let preselectedSubCategory = null;
+
     let filterData = {
         categories: { components: [], peripherals: [] },
         brands: [],
@@ -27,7 +29,6 @@
     let isLoading = true;
     let error = null;
 
-    // Fetch filter options automatically on mount
     async function fetchFilterOptions() {
         try {
             const response = await fetch('http://localhost:3001/api/filter-com-hardware');
@@ -43,6 +44,18 @@
             };
             minPrice = data.priceRange.min.toString();
             maxPrice = data.priceRange.max.toString();
+            if (preselectedSubCategory) {
+                const subCategoryId = parseInt(preselectedSubCategory);
+                const isComponent = filterData.categories.components.some(cat => cat.id === subCategoryId);
+                const isPeripheral = filterData.categories.peripherals.some(cat => cat.id === subCategoryId);
+                if (isComponent || isPeripheral) {
+                    selectedSubCategories = [subCategoryId];
+                    showCategories = true;
+                    showComponents = isComponent;
+                    showPeripherals = isPeripheral;
+                    applyFilters();
+                }
+            }
         } catch (err) {
             error = err.message;
         } finally {
@@ -50,9 +63,10 @@
         }
     }
 
-    fetchFilterOptions();
+    onMount(() => {
+        fetchFilterOptions();
+    });
 
-    // Toggle functions
     const toggleAvailability = (type) => {
         filterData.availability[type] = !filterData.availability[type];
     };
@@ -69,7 +83,6 @@
             : [...selectedBrands, brand];
     };
 
-    // Apply filters
     async function applyFilters() {
         try {
             const queryParams = new URLSearchParams();
@@ -92,7 +105,6 @@
             if (!response.ok) throw new Error('Failed to fetch filtered products');
             const products = await response.json();
             
-            // Dispatch custom event to notify parent component of filtered products
             const event = new CustomEvent('filterApplied', { detail: { products } });
             document.dispatchEvent(event);
         } catch (err) {
@@ -100,9 +112,8 @@
         }
     }
 
-    // Reset filters
     function resetFilters() {
-        selectedSubCategories = [];
+        selectedSubCategories = preselectedSubCategory ? [parseInt(preselectedSubCategory)] : [];
         selectedBrands = [];
         filterData.availability.inStock = false;
         filterData.availability.outOfStock = false;
@@ -279,7 +290,6 @@
                 </div>
             </div>
 
-            <!-- Dual Range Slider -->
             <div class="relative h-2">
                 <div class="absolute top-1/2 w-full h-1 bg-amber-300 rounded-full"></div>
                 
@@ -312,40 +322,3 @@
         Apply Filters
     </button>
 </div>
-
-<style>
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-
-    input[type="number"] {
-        -moz-appearance: textfield;
-    }
-
-    input[type="checkbox"] {
-        accent-color: #CA9335;
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-    }
-    
-    label {
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .filter-section {
-        border-bottom: 1px solid #e5e7eb;
-        transition: all 0.2s ease;
-    }
-    
-    .filter-section button {
-        transition: all 0.2s ease;
-    }
-    
-    .filter-section button:hover {
-        opacity: 0.8;
-    }
-</style>

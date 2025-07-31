@@ -267,57 +267,7 @@
         </div>
     {/if}
     
-    <button class="filter-btn w-full bg-[#CA9335] text-white py-2 rounded hover:bg-white hover:text-[#CA9335] hover:border-2 hover:border-[#CA9335] transition-colors mt-4" on:click={applyFilters}>
+    <button class="filter-btn w-full bg-[#CA9335] text-white py-2 rounded" on:click={applyFilters}>
         Apply Filters
     </button>
 </div>
-
-<style>
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-
-    /* input[type="number"] {
-        -moz-appearance: textfield;
-    } */
-
-    input[type="checkbox"] {
-        accent-color: #CA9335;
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-    }
-    
-    label {
-        cursor: pointer;
-        user-select: none;
-    }
-
-    /* .filter-btn{
-        background-color: #CA9335;
-        color: white;
-        border-radius: 5px;
-        transition: all 0.3s;
-    }
-
-    .filter-btn:hover {
-        border: 2px solid #CA9335;
-        color: #CA9335;
-        background-color: white;
-    } */
-    
-    .filter-section {
-        border-bottom: 1px solid #e5e7eb;
-        transition: all 0.2s ease;
-    }
-    
-    .filter-section button {
-        transition: all 0.2s ease;
-    }
-    
-    .filter-section button:hover {
-        opacity: 0.8;
-    }
-</style>

@@ -6,9 +6,9 @@
     let products = [];
     let isLoading = true;
     let error = null;
-    let sortOption = 'default'; // Default sort option
+    let sortOption = 'default';
+    export let preselectedSubCategory = null;
 
-    // Sorting options
     const sortOptions = [
         { value: 'default', label: 'Default' },
         { value: 'alpha-asc', label: 'Alphabetically A-Z' },
@@ -19,12 +19,13 @@
         { value: 'date-desc', label: 'Date, New to Old' }
     ];
 
-    // Fetch all hardware products with sort option
-    async function fetchAllProducts() {
+    async function fetchProducts() {
         try {
-            const url = sortOption === 'default' 
-                ? 'http://localhost:3001/api/filter-com-hardware/products'
-                : `http://localhost:3001/api/filter-com-hardware/products?sort=${sortOption}`;
+            let url = 'http://localhost:3001/api/filter-com-hardware/products';
+            const params = new URLSearchParams();
+            if (sortOption !== 'default') params.append('sort', sortOption);
+            if (preselectedSubCategory) params.append('subCategories', preselectedSubCategory);
+            if (params.toString()) url += `?${params.toString()}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to fetch products');
             products = await response.json();
@@ -35,23 +36,23 @@
         }
     }
 
-    // Handle sort change
     async function handleSortChange() {
         isLoading = true;
         error = null;
-        await fetchAllProducts();
+        await fetchProducts();
     }
 
-    // Listen for filterApplied event from ComputerHardwareFilter
     function handleFilterApplied(event) {
         products = event.detail.products;
         isLoading = false;
         error = null;
     }
 
-    // Add event listeners and fetch products on mount
     onMount(() => {
-        fetchAllProducts();
+        // Read query parameter from URL
+        const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+        preselectedSubCategory = urlParams.get('subCategory');
+        fetchProducts();
         document.addEventListener('filterApplied', handleFilterApplied);
         return () => {
             document.removeEventListener('filterApplied', handleFilterApplied);
@@ -61,7 +62,7 @@
 
 <ProductLayout title="">
     <svelte:fragment slot="filter">
-        <ComputerHardwareFilter />
+        <ComputerHardwareFilter {preselectedSubCategory} />
     </svelte:fragment>
 
     <svelte:fragment slot="products">
@@ -72,18 +73,18 @@
         {:else}
             <div class="product-counter flex flex-row justify-end items-center gap-4 mb-4">
                 <div class="flex items-center gap-2">
-                    <span class="text-base text-gray-500 font-semibold">Sort by:</span>
+                    <span class="text-base">Sort by:</span>
                     <select
                         bind:value={sortOption}
                         on:change={handleSortChange}
-                        class="text-gray-500 font-semibold rounded-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-[#000000]"
+                        class="rounded-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-[#000000]"
                     >
                         {#each sortOptions as option}
-                            <option class="text-gray-500 font-semibold" value={option.value}>{option.label}</option>
+                            <option value={option.value}>{option.label}</option>
                         {/each}
                     </select>
                 </div>
-                <h1 class="text-base text-gray-500 font-semibold">{products.length} Products</h1>
+                <h1 class="text-base">{products.length} Products</h1>
             </div>
             <div class="grid grid-cols-3 gap-2">
                 {#each products as product}
@@ -99,7 +100,7 @@
                         </div>
                         <div class="text-center">
                             <h3 class="font-bold text-lg hover:underline">{product.name}</h3>
-                            <p class="font-bold text-[#CA9335] text-mb">₱{product.price.toFixed(2)}</p>
+                            <p class="font-bold text-[#CA9335] text-mb">${product.price.toFixed(2)}</p>
                         </div>
                     </div>
                 {/each}

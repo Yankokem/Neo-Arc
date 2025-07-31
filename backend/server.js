@@ -6,6 +6,7 @@ import filterDataRoutes from './routes/filterAll.js';
 import allProductsRoutes from './routes/allProducts.js';
 import filterGadgetsRoutes from './routes/filterGadgets.js';
 import filterComHardwareRoutes from './routes/filterComHardware.js';
+import navMenuRoutes from './routes/navMenu.js';
 
 import dotenv from 'dotenv';
 import path from 'path';
@@ -30,6 +31,7 @@ app.use('/api/filter-data', filterDataRoutes);
 app.use('/api/all-products', allProductsRoutes);
 app.use('/api/filter-gadgets', filterGadgetsRoutes);
 app.use('/api/filter-com-hardware', filterComHardwareRoutes);
+app.use('/api/nav-menu', navMenuRoutes);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

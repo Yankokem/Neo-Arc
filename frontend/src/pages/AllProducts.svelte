@@ -1,6 +1,6 @@
 <script>
     import ProductLayout from '../components/ProductLayout.svelte';
-    import ProductFilter from '../components/ProductFilter.svelte';
+    import ProductFilter from '../components/AllFilter.svelte';
     import { onMount } from 'svelte';
 
     let products = [];
@@ -112,14 +112,6 @@
     :global(.product-column) {
         padding: 0 !important;
         margin: 0 !important;
-    }
-
-    .product-card {
-        transition: transform 0.2s;
-    }
-    
-    .product-card:hover {
-        transform: translateY(-5px);
     }
 
     @media (max-width: 1024px) {

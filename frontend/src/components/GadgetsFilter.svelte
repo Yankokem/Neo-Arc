@@ -1,7 +1,9 @@
 <script>
     import { fade } from 'svelte/transition';
+    import { onMount } from 'svelte';
 
-    // State for filters
+    export let preselectedCategory = null;
+
     let filterData = {
         categories: [],
         brands: [],
@@ -25,7 +27,6 @@
     let isLoading = true;
     let error = null;
 
-    // Fetch filter options automatically on mount
     async function fetchFilterOptions() {
         try {
             const response = await fetch('http://localhost:3001/api/filter-gadgets');
@@ -41,6 +42,15 @@
             };
             minPrice = data.priceRange.min.toString();
             maxPrice = data.priceRange.max.toString();
+            // Pre-select category if provided
+            if (preselectedCategory) {
+                const categoryId = parseInt(preselectedCategory);
+                if (filterData.categories.some(cat => cat.id === categoryId)) {
+                    selectedCategories = [categoryId];
+                    showCategories = true;
+                    applyFilters();
+                }
+            }
         } catch (err) {
             error = err.message;
         } finally {
@@ -48,9 +58,10 @@
         }
     }
 
-    fetchFilterOptions();
+    onMount(() => {
+        fetchFilterOptions();
+    });
 
-    // Toggle functions
     const toggleAvailability = (type) => {
         filterData.availability[type] = !filterData.availability[type];
     };
@@ -67,12 +78,11 @@
             : [...selectedBrands, brand];
     };
 
-    // Apply filters
     async function applyFilters() {
         try {
             const queryParams = new URLSearchParams();
             if (selectedCategories.length > 0) {
-                queryParams.append('categories', selectedCategories.join(','));
+                queryParams.append('category', selectedCategories.join(','));
             }
             if (selectedBrands.length > 0) {
                 queryParams.append('brands', selectedBrands.join(','));
@@ -90,7 +100,6 @@
             if (!response.ok) throw new Error('Failed to fetch filtered products');
             const products = await response.json();
             
-            // Dispatch custom event to notify parent component of filtered products
             const event = new CustomEvent('filterApplied', { detail: { products } });
             document.dispatchEvent(event);
         } catch (err) {
@@ -98,9 +107,8 @@
         }
     }
 
-    // Reset filters
     function resetFilters() {
-        selectedCategories = [];
+        selectedCategories = preselectedCategory ? [parseInt(preselectedCategory)] : [];
         selectedBrands = [];
         filterData.availability.inStock = false;
         filterData.availability.outOfStock = false;
@@ -237,7 +245,6 @@
                 </div>
             </div>
 
-            <!-- Dual Range Slider -->
             <div class="relative h-2">
                 <div class="absolute top-1/2 w-full h-1 bg-amber-300 rounded-full"></div>
                 
@@ -270,40 +277,3 @@
         Apply Filters
     </button>
 </div>
-
-<style>
-    input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
-
-    input[type="number"] {
-        -moz-appearance: textfield;
-    }
-
-    input[type="checkbox"] {
-        accent-color: #CA9335;
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-    }
-    
-    label {
-        cursor: pointer;
-        user-select: none;
-    }
-
-    .filter-section {
-        border-bottom: 1px solid #e5e7eb;
-        transition: all 0.2s ease;
-    }
-    
-    .filter-section button {
-        transition: all 0.2s ease;
-    }
-    
-    .filter-section button:hover {
-        opacity: 0.8;
-    }
-</style>
