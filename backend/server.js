@@ -7,7 +7,7 @@ import allProductsRoutes from './routes/allProducts.js';
 import filterGadgetsRoutes from './routes/filterGadgets.js';
 import filterComHardwareRoutes from './routes/filterComHardware.js';
 import navMenuRoutes from './routes/navMenu.js';
-
+import cartRoutes from './routes/cart.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -32,6 +32,7 @@ app.use('/api/all-products', allProductsRoutes);
 app.use('/api/filter-gadgets', filterGadgetsRoutes);
 app.use('/api/filter-com-hardware', filterComHardwareRoutes);
 app.use('/api/nav-menu', navMenuRoutes);
+app.use('/api/cart', cartRoutes);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

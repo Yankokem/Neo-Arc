@@ -6,9 +6,9 @@
     let products = [];
     let isLoading = true;
     let error = null;
-    let sortOption = 'default';
-    export let preselectedCategory = null;
+    let sortOption = 'default'; // Default sort option
 
+    // Sorting options
     const sortOptions = [
         { value: 'default', label: 'Default' },
         { value: 'alpha-asc', label: 'Alphabetically A-Z' },
@@ -19,13 +19,12 @@
         { value: 'date-desc', label: 'Date, New to Old' }
     ];
 
-    async function fetchProducts() {
+    // Fetch all gadget products with sort option
+    async function fetchAllProducts() {
         try {
-            let url = 'http://localhost:3001/api/filter-gadgets/products';
-            const params = new URLSearchParams();
-            if (sortOption !== 'default') params.append('sort', sortOption);
-            if (preselectedCategory) params.append('category', preselectedCategory);
-            if (params.toString()) url += `?${params.toString()}`;
+            const url = sortOption === 'default' 
+                ? 'http://localhost:3001/api/filter-gadgets/products'
+                : `http://localhost:3001/api/filter-gadgets/products?sort=${sortOption}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Failed to fetch products');
             products = await response.json();
@@ -36,22 +35,23 @@
         }
     }
 
+    // Handle sort change
     async function handleSortChange() {
         isLoading = true;
         error = null;
-        await fetchProducts();
+        await fetchAllProducts();
     }
 
+    // Listen for filterApplied event from GadgetsFilter
     function handleFilterApplied(event) {
         products = event.detail.products;
         isLoading = false;
         error = null;
     }
 
+    // Add event listeners and fetch products on mount
     onMount(() => {
-        const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
-        preselectedCategory = urlParams.get('category');
-        fetchProducts();
+        fetchAllProducts();
         document.addEventListener('filterApplied', handleFilterApplied);
         return () => {
             document.removeEventListener('filterApplied', handleFilterApplied);
@@ -61,7 +61,7 @@
 
 <ProductLayout title="">
     <svelte:fragment slot="filter">
-        <GadgetsFilter {preselectedCategory} />
+        <GadgetsFilter />
     </svelte:fragment>
 
     <svelte:fragment slot="products">
@@ -87,8 +87,8 @@
             </div>
             <div class="grid grid-cols-3 gap-2">
                 {#each products as product}
-                    <div class="product-card flex flex-col" style="flex: 1 1 0%;">
-                        <div class="relative aspect-square w-full bg-gray-100 mb-2 overflow-hidden rounded-2xl">
+                    <a href="#product/{product.id}" class="product-card flex flex-col" style="flex: 1 1 0%;">
+                        <div class="image-container relative aspect-square w-full bg-gray-100 mb-2 overflow-hidden rounded-2xl">
                             {#if product.image_url}
                                 <img src={`http://localhost:3001${product.image_url}`} alt={product.name} class="absolute h-full w-full object-cover"/>
                             {:else}
@@ -101,7 +101,7 @@
                             <h3 class="font-bold text-lg hover:underline">{product.name}</h3>
                             <p class="font-bold text-[#CA9335] text-mb">${product.price.toFixed(2)}</p>
                         </div>
-                    </div>
+                    </a>
                 {/each}
             </div>
         {/if}
@@ -112,14 +112,6 @@
     :global(.product-column) {
         padding: 0 !important;
         margin: 0 !important;
-    }
-
-    .product-card {
-        transition: transform 0.2s;
-    }
-    
-    .product-card:hover {
-        transform: translateY(-5px);
     }
 
     @media (max-width: 1024px) {

@@ -88,7 +88,7 @@
             </div>
             <div class="grid grid-cols-3 gap-2">
                 {#each products as product}
-                    <div class="product-card flex flex-col" style="flex: 1 1 0%;">
+                    <a href="#product/{product.id}" class="product-card flex flex-col" style="flex: 1 1 0%;">
                         <div class="relative aspect-square w-full bg-gray-100 mb-2 overflow-hidden rounded-2xl">
                             {#if product.image_url}
                                 <img src={`http://localhost:3001${product.image_url}`} alt={product.name} class="absolute h-full w-full object-cover"/>
@@ -100,9 +100,9 @@
                         </div>
                         <div class="text-center">
                             <h3 class="font-bold text-lg hover:underline">{product.name}</h3>
-                            <p class="font-bold text-[#CA9335] text-mb">${product.price.toFixed(2)}</p>
+                            <p class="font-bold text-[#CA9335] text-mb">₱{product.price.toFixed(2)}</p>
                         </div>
-                    </div>
+                    </a>
                 {/each}
             </div>
         {/if}

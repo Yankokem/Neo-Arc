@@ -6,14 +6,27 @@
     import ComputerHardware from './pages/ComputerHardware.svelte';
     import Gadgets from './pages/Gadgets.svelte';
     import Home from './pages/Home.svelte';
-    
-    // Track current page
-    let currentPage = window.location.hash.substring(1) || 'home';
-    
+    import ProductDetail from './pages/ProductDetail.svelte';
+
+    // Track current page and product ID
+    let currentPage = 'home';
+    let productId = null;
+
     // Update when URL hash changes
-    window.addEventListener('hashchange', () => {
-        currentPage = window.location.hash.substring(1) || 'home';
-    });
+    function updateRoute() {
+        const hash = window.location.hash.substring(1) || 'home';
+        const productMatch = hash.match(/^product\/(\d+)$/);
+        if (productMatch) {
+            currentPage = 'product';
+            productId = productMatch[1];
+        } else {
+            currentPage = hash;
+            productId = null;
+        }
+    }
+
+    updateRoute();
+    window.addEventListener('hashchange', updateRoute);
 </script>
 
 <Navbar />
@@ -29,6 +42,8 @@
             <AllProducts />
         {:else if currentPage === 'cart'}
             <Cart />
+        {:else if currentPage === 'product'}
+            <ProductDetail {productId} />
         {/if}
     </main>
     <Footer />
@@ -36,7 +51,6 @@
 
 <style>
     .app-container {
-        /* border: 2px solid red; */
         max-width: 1440px;
         margin: 20px auto 0 auto;
         display: flex;

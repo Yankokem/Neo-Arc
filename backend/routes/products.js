@@ -22,6 +22,7 @@ router.get('/', async (req, res) => {
         
         res.json(processedRows);
     } catch (error) {
+        console.error('Error fetching products:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -45,6 +46,7 @@ router.get('/newest', async (req, res) => {
         
         res.json(processedRows);
     } catch (error) {
+        console.error('Error fetching newest products:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -68,6 +70,7 @@ router.get('/cheapest', async (req, res) => {
         
         res.json(processedRows);
     } catch (error) {
+        console.error('Error fetching cheapest products:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -90,6 +93,35 @@ router.get('/category/:categoryId', async (req, res) => {
         
         res.json(processedRows);
     } catch (error) {
+        console.error('Error fetching products by category:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Get product details by ID
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [rows] = await pool.query(
+            `SELECT p.*, c.name as category_name, sc.name as sub_category_name, b.name as brand_name
+             FROM products p
+             LEFT JOIN categories c ON p.category_id = c.id
+             LEFT JOIN sub_categories sc ON p.sub_category_id = sc.id
+             LEFT JOIN brands b ON p.brand_id = b.id
+             WHERE p.id = ?`,
+            [id]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        const product = {
+            ...rows[0],
+            price: Number(rows[0].price),
+            stock: Number(rows[0].stock)
+        };
+        res.json(product);
+    } catch (error) {
+        console.error('Error fetching product:', error);
         res.status(500).json({ message: error.message });
     }
 });
