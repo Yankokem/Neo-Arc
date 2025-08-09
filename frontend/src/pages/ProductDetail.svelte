@@ -1,60 +1,115 @@
 <script>
-    import { onMount } from 'svelte';
-    export let productId;
-    
-    let product = null;
-    let isLoading = true;
-    let error = null;
-    let quantity = 1;
+  import { onMount } from 'svelte';
+  export let productId;
+  export let previousPage;
 
-    // Fetch product details
-    async function fetchProduct() {
-        try {
-            const response = await fetch(`http://localhost:3001/api/products/${productId}`);
-            if (!response.ok) {
-                throw new Error(response.status === 404 ? 'Product not found' : 'Failed to fetch product');
-            }
-            product = await response.json();
-        } catch (err) {
-            error = err.message;
-        } finally {
-            isLoading = false;
-        }
+  let product = null;
+  let isLoading = true;
+  let error = null;
+  let quantity = 1;
+  let isAuthenticated = false;
+  let user = null;
+  let guestId = null;
+  let csrfToken = null;
+
+  async function fetchCsrfToken() {
+    try {
+      const response = await fetch('http://localhost:3001/api/csrf-token', {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch CSRF token');
+      const data = await response.json();
+      csrfToken = data.csrfToken;
+    } catch (err) {
+      console.error('CSRF token fetch error:', err);
+      error = 'Failed to initialize security token';
     }
+  }
 
-    // Add to cart
-    async function addToCart() {
-        try {
-            const response = await fetch('http://localhost:3001/api/cart/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productId: Number(productId), quantity: Number(quantity), userId: null })
-            });
-            if (!response.ok) {
-                throw new Error('Failed to add to cart');
-            }
-            const result = await response.json();
-            alert(result.message); // Temporary feedback; replace with UI notification later
-        } catch (err) {
-            error = err.message;
-        }
+  async function checkAuth() {
+    try {
+      const response = await fetch('http://localhost:3001/api/auth/me', {
+        method: 'GET',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        isAuthenticated = true;
+        user = data.user;
+        guestId = null;
+        localStorage.removeItem('guestId');
+      } else {
+        isAuthenticated = false;
+        user = null;
+        guestId = localStorage.getItem('guestId') || crypto.randomUUID();
+        localStorage.setItem('guestId', guestId);
+      }
+    } catch (err) {
+      isAuthenticated = false;
+      user = null;
+      guestId = localStorage.getItem('guestId') || crypto.randomUUID();
+      localStorage.setItem('guestId', guestId);
     }
+  }
 
-    // Handle quantity change
-    function updateQuantity(delta) {
-        const newQuantity = quantity + delta;
-        if (newQuantity >= 1 && (!product || newQuantity <= product.stock)) {
-            quantity = newQuantity;
-        }
+  async function fetchProduct() {
+    try {
+      const response = await fetch(`http://localhost:3001/api/products/${productId}`);
+      if (!response.ok) {
+        throw new Error(response.status === 404 ? 'Product not found' : 'Failed to fetch product');
+      }
+      product = await response.json();
+    } catch (err) {
+      error = err.message;
+    } finally {
+      isLoading = false;
     }
+  }
 
-    onMount(fetchProduct);
+  async function addToCart() {
+    try {
+      const body = { productId: Number(productId), quantity: Number(quantity), _csrf: csrfToken };
+      if (isAuthenticated) {
+        body.userId = user.id;
+      } else {
+        body.guestId = guestId;
+      }
+      const response = await fetch('http://localhost:3001/api/cart/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to add to cart');
+      }
+      const result = await response.json();
+      alert(result.message);
+    } catch (err) {
+      error = err.message;
+    }
+  }
+
+  function updateQuantity(delta) {
+    const newQuantity = quantity + delta;
+    if (newQuantity >= 1 && (!product || newQuantity <= product.stock)) {
+      quantity = newQuantity;
+    }
+  }
+
+  onMount(async () => {
+    await fetchCsrfToken();
+    await checkAuth();
+    await fetchProduct();
+  });
 </script>
 
-<div class="product-detail flex flex-col p-8 max-w-4xl mx-auto">
+<!-- Your existing ProductDetail.svelte HTML remains unchanged -->
+
+<div class="product-detail border-2 flex flex-col p-8 max-w-4xl mx-auto">
     <div class="top flex flex-row justify-between items-center mb-6">
-        <a href="#gadgets" class="text-[#CA9335] font-semibold text-lg hover:text-amber-600 transition-colors">
-            <span class="material-icons-outlined">keyboard_backspace</span> Back to Gadgets
+        <a href="#{previousPage}" class="text-[#CA9335] font-semibold text-lg hover:text-amber-600 transition-colors">
+            <span class="material-icons-outlined">keyboard_backspace</span> Back
         </a>
         <h1 class="text-4xl text-[#CA9335] font-bold">PRODUCT DETAILS</h1>
     </div>
@@ -65,7 +120,7 @@
         <div class="p-4 text-red-500">Error: {error}</div>
     {:else if product}
         <div class="content flex flex-row gap-8">
-            <div class="image-container w-150 h-150 drop-shadow-[0_3px_8px_#CA9335] bg-gray-100 rounded-md flex items-center justify-center">
+            <div class="image-container w-96 h-96 bg-gray-100 rounded-md flex items-center justify-center">
                 {#if product.image_url}
                     <img src={`http://localhost:3001${product.image_url}`} alt={product.name} class="w-full h-full object-cover rounded-md" />
                 {:else}
@@ -76,7 +131,7 @@
                 <div>
                     <h2 class="text-2xl text-gray-600 font-semibold">{product.name}</h2>
                     {#if product.brand_name}
-                        <p class="text-base text-gray-600">{product.brand_name}</p>
+                        <p class="text-base text-gray-600">Brand: {product.brand_name}</p>
                     {/if}
                 </div>
                 <p class="text-[#CA9335] font-semibold text-xl">₱{product.price.toFixed(2)}</p>

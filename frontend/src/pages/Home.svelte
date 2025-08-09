@@ -72,7 +72,7 @@
             </div>
 
             {#each featuredProducts as product}
-                <div class="product-card flex flex-col" style="flex: 1 1 0%;">
+                <a href="#product/{product.id}" class="product-card flex flex-col" style="flex: 1 1 0%;">
                     <div class="relative aspect-square w-full bg-gray-100 mb-2 overflow-hidden rounded-2xl">
                         {#if product.image_url}
                             <img src={`http://localhost:3001${product.image_url}`} alt={product.name} class="absolute h-full w-full object-cover"/>
@@ -86,7 +86,7 @@
                         <h3 class="font-bold text-lg hover:underline">{product.name}</h3>
                         <p class="font-bold text-[#CA9335] text-mb">₱{product.price.toFixed(2)}</p>
                     </div>
-                </div>
+                </a>
             {/each}
         </div>
     </section>
@@ -94,7 +94,7 @@
     <section class="new-arrivals">
         <div class="flex gap-6 w-full">
             {#each newArrivals as product}
-                <div class="product-card flex flex-col" style="flex: 1 1 0%;">
+                <a href="#product/{product.id}" class="product-card flex flex-col" style="flex: 1 1 0%;">
                     <div class="relative aspect-square w-full bg-gray-100 mb-2 overflow-hidden rounded-2xl">
                         {#if product.image_url}
                             <img src={`http://localhost:3001${product.image_url}`} alt={product.name} class="absolute h-full w-full object-cover"/>
@@ -108,7 +108,7 @@
                         <h3 class="font-bold text-lg hover:underline">{product.name}</h3>
                         <p class="font-bold text-[#CA9335] text-mb">₱{product.price.toFixed(2)}</p>
                     </div>
-                </div>
+                </a>
             {/each}
 
             <div class="sidebar flex-shrink-0 text-[#CA9335] p-6 rounded-lg flex flex-col justify-center items-center" style="flex: 1 1 0%;">
@@ -120,65 +120,62 @@
         </div>
     </section>
 
-<section class="featured-categories">
-    <h2 class="text-2xl font-bold mb-6 text-center text-[#CA9335]">Shop by Category</h2>
-    <div class="grid grid-cols-2 gap-6">
+    <section class="featured-categories">
+        <h2 class="text-2xl font-bold mb-6 text-center text-[#CA9335]">Shop by Category</h2>
+        <div class="grid grid-cols-2 gap-6">
+            <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
+                <img src="{smartphone_category}" alt="Smartphones" class="w-full h-full object-cover"/>
+                <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
+                    Smartphones
+                </button>
+            </div>
 
-        <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
-            <img src="{smartphone_category}" alt="Smartphones" class="w-full h-full object-cover"/>
-            <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
-                Smartphones
-            </button>
-        </div>
+            <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
+                <img src="{tablets_category}" alt="Tablets" class="w-full h-full object-cover"/>
+                <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
+                    Tablets
+                </button>
+            </div>
 
-        <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
-            <img src="{tablets_category}" alt="Smartwatches" class="w-full h-full object-cover"/>
-            <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl ">
-                Tablets
-            </button>
-        </div>
+            <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
+                <img src="{smartwatches_category}" alt="Smartwatches" class="w-full h-full object-cover"/>
+                <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
+                    Smartwatches
+                </button>
+            </div>
 
-        <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
-            <img src="{smartwatches_category}" alt="Laptops" class="w-full h-full object-cover"/>
-            <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl ">
-                Smartwatches
-            </button>
-        </div>
+            <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
+                <img src="{audio_category}" alt="Audio" class="w-full h-full object-cover"/>
+                <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
+                    Audio
+                </button>
+            </div>
 
-        <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
-            <img src="{audio_category}" alt="Smartwatches" class="w-full h-full object-cover"/>
-            <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl ">
-                Audio
-            </button>
-        </div>
+            <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
+                <img src="{laptopts_category}" alt="Laptops" class="w-full h-full object-cover"/>
+                <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
+                    Laptops
+                </button>
+            </div>
 
-        <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
-            <img src="{laptopts_category}" alt="Accessories" class="w-full h-full object-cover"/>
-            <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl ">
-                Laptops
-            </button>
-        </div>
+            <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
+                <img src="{computer_accessories_category}" alt="Peripherals" class="w-full h-full object-cover"/>
+                <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
+                    Peripherals
+                </button>
+            </div>
 
-        <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
-            <img src="{computer_accessories_category}" alt="Components" class="w-full h-full object-cover"/>
-            <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl ">
-                Peripherals
-            </button>
+            <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
+                <img src="{computer_components_category}" alt="Components" class="w-full h-full object-cover"/>
+                <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl">
+                    Components
+                </button>
+            </div>
         </div>
-        <div class="category-card h-[300px] bg-gray-100 rounded-xl overflow-hidden relative">
-            <img src="{computer_components_category}" alt="Smartphones" class="w-full h-full object-cover"/>
-            <button class="category-btn absolute bottom-3 left-3 bg-[#CA9335] text-white px-6 py-2 rounded-4xl ">
-                Components
-            </button>
-        </div>
-
-    </div>
-</section>
+    </section>
 </div>
 
 <style>
-
-    
     .category-card {
         position: relative;
         overflow: hidden;
@@ -205,11 +202,10 @@
         transition: all 0.3s ease;
     }
 
-    .category-btn:hover{
+    .category-btn:hover {
         color: #CA9335;
         background-color: white;
     }
-
 
     .sidebar {
         color: #CA9335;
@@ -233,5 +229,11 @@
         background-color: #CA9335;
     }
 
+    .product-card {
+        transition: transform 0.2s;
+    }
 
+    .product-card:hover {
+        transform: translateY(-5px);
+    }
 </style>
