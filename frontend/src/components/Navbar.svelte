@@ -9,6 +9,7 @@
   let user = null;
   let isAccountDropdownOpen = false;
   let csrfToken = null;
+  let profileImageUrl = null;
 
   async function fetchCsrfToken() {
     try {
@@ -47,13 +48,30 @@
         const data = await response.json();
         isAuthenticated = true;
         user = data.user;
+        await fetchProfileImage();
       } else {
         isAuthenticated = false;
         user = null;
+        profileImageUrl = null;
       }
     } catch (err) {
       isAuthenticated = false;
       user = null;
+      profileImageUrl = null;
+    }
+  }
+
+  async function fetchProfileImage() {
+    try {
+      const response = await fetch('http://localhost:3001/api/auth/me', {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch user data');
+      const data = await response.json();
+      profileImageUrl = data.user.profile_image_url || null;
+    } catch (err) {
+      console.error('Profile image fetch error:', err);
+      profileImageUrl = null;
     }
   }
 
@@ -73,6 +91,7 @@
         isAuthenticated = false;
         user = null;
         isAccountDropdownOpen = false;
+        profileImageUrl = null;
         window.location.hash = 'home';
       } else {
         throw new Error('Logout failed');
@@ -86,6 +105,7 @@
   function handleUserLoggedIn(e) {
     user = e.detail;
     isAuthenticated = true;
+    fetchProfileImage();
   }
 
   function toggleAccountDropdown() {
@@ -170,7 +190,13 @@
       <div class="account relative flex flex-col items-end">
         {#if isAuthenticated}
           <div class="flex items-center gap-2 cursor-pointer" on:click={toggleAccountDropdown}>
-            <span class="material-icons-outlined leading-none text-[#CA9335] align-middle inline-block">account_box</span>
+            <div class="relative">
+              {#if profileImageUrl}
+                <img src={`http://localhost:3001${profileImageUrl}`} alt="Profile" class="w-10 h-10 rounded-full">
+              {:else}
+                <span class="material-icons-outlined leading-none text-[#CA9335] align-middle inline-block text-[40px]">account_box</span>
+              {/if}
+            </div>
             <div class="flex flex-col">
               <div class="text-[#CA9335] text-lg font-semibold cursor-default">{user.username}</div>
               <div class="account-text text-gray-500 text-sm cursor-pointer hover:underline">
@@ -195,6 +221,14 @@
 </nav>
 
 <style>
+  .relative {
+    position: relative;
+  }
+  
+  .absolute {
+    position: absolute;
+  }
+
   a {
     color: #CA9335;
     position: relative;
