@@ -15,11 +15,50 @@ import authRoutes from './routes/auth.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
+import fs from 'fs';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Configure multer for file uploads
+const uploadDir = path.join(__dirname, 'public', 'users');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const username = req.body.username;
+    const userDir = path.join(uploadDir, username, 'pfp');
+    if (!fs.existsSync(userDir)) {
+      fs.mkdirSync(userDir, { recursive: true });
+    }
+    cb(null, userDir);
+  },
+  filename: (req, file, cb) => {
+    const userId = req.user?.userId || 'temp'; // Temp for registration
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${userId}_profile${ext}`);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JPEG, PNG, and GIF images are allowed'), false);
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 const app = express();
 
@@ -46,13 +85,22 @@ app.use(
     credentials: true
   })
 );
-app.use(express.json());
 
-// CSRF protection
-app.use(csurf({ cookie: true }));
+// Parse JSON and form-data bodies
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Add for form-data parsing
 
 // Serve static files
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
+app.use('/users', express.static(path.join(__dirname, 'public', 'users')));
+
+// CSRF protection
+app.use(csurf({ cookie: { httpOnly: true, sameSite: 'strict' } }));
+
+// CSRF token endpoint
+app.get('/api/csrf-token', (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 // Routes
 app.use('/api/products', productRoutes);
@@ -65,9 +113,16 @@ app.use('/api/nav-menu', navMenuRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/auth', authRoutes);
 
-// CSRF token endpoint
-app.get('/api/csrf-token', (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
+// Error handling for multer and CSRF
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ message: `File upload error: ${err.message}` });
+  } else if (err.code === 'EBADCSRFTOKEN') {
+    return res.status(403).json({ message: 'Invalid CSRF token' });
+  } else if (err) {
+    return res.status(400).json({ message: err.message });
+  }
+  next();
 });
 
 const PORT = process.env.PORT || 3001;
