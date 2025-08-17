@@ -16,7 +16,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
-import fs from 'fs';
+import { promises as fs } from 'fs';
 
 dotenv.config();
 
@@ -25,23 +25,17 @@ const __dirname = path.dirname(__filename);
 
 // Configure multer for file uploads
 const uploadDir = path.join(__dirname, 'public', 'users');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+await fs.mkdir(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const username = req.body.username;
-    const userDir = path.join(uploadDir, username, 'pfp');
-    if (!fs.existsSync(userDir)) {
-      fs.mkdirSync(userDir, { recursive: true });
-    }
+  destination: async (req, file, cb) => {
+    const userDir = path.join(__dirname, 'public', 'users', req.user?.username || 'temp', 'pfp');
+    await fs.mkdir(userDir, { recursive: true });
     cb(null, userDir);
   },
   filename: (req, file, cb) => {
-    const userId = req.user?.userId || 'temp'; // Temp for registration
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${userId}_profile${ext}`);
+    cb(null, `profile${ext}`);
   }
 });
 
@@ -88,7 +82,7 @@ app.use(
 
 // Parse JSON and form-data bodies
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Add for form-data parsing
+app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));

@@ -71,7 +71,7 @@
                     <select
                         bind:value={sortOption}
                         on:change={handleSortChange}
-                        class="text-gray-500 font-semibold rounded-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-[#000000]"
+                        class="text-gray-500 font-semibold rounded-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-[#9E9E9E]"
                     >
                         {#each sortOptions as option}
                             <option class="text-gray-500 font-semibold" value={option.value}>{option.label}</option>

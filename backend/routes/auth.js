@@ -1,358 +1,430 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import pool from '../db.js';
-import { body, validationResult } from 'express-validator';
-import multer from 'multer';
+import mysql from 'mysql2/promise';
 import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { promises as fs } from 'fs';
+import multer from 'multer';
+import { body, validationResult } from 'express-validator';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
-// Multer configuration for profile picture uploads
-const uploadDir = path.join(__dirname, '..', 'public', 'users');
+// Middleware to ensure userId is set
+const ensureUserId = (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+  next();
+};
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const username = req.body.username || req.user?.username;
-    const userDir = path.join(uploadDir, username, 'pfp');
-    if (!fs.existsSync(userDir)) {
-      fs.mkdirSync(userDir, { recursive: true });
+  destination: async (req, file, cb) => {
+    const userDir = path.join(import.meta.dirname, '../public/users', req.session.userId.toString(), 'pfp');
+    await fs.mkdir(userDir, { recursive: true });
+    // Clear existing files to ensure overwrite
+    const files = await fs.readdir(userDir);
+    for (const oldFile of files) {
+      await fs.unlink(path.join(userDir, oldFile));
     }
     cb(null, userDir);
   },
   filename: (req, file, cb) => {
-    const userId = req.user?.userId || 'temp'; // Temp for registration
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${userId}_profile${ext}`);
+    const ext = path.extname(file.originalname);
+    cb(null, `profile${ext}`);
   }
 });
-
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only JPEG, PNG, and GIF images are allowed'), false);
-  }
-};
 
 const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only JPEG, PNG, or GIF images are allowed'));
+  }
 });
 
-export const authenticateToken = (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) return res.status(401).json({ message: 'Unauthorized' });
+// Validation middleware for registration
+const validateRegisterInput = [
+  body('username').notEmpty().withMessage('Username is required').isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('first_name').optional().isString(),
+  body('last_name').optional().isString(),
+  body('address').optional().isString(),
+  body('phone').optional().isString().matches(/^\+?\d{10,15}$/).withMessage('Phone must be 10-15 digits'),
+  body('date_of_birth').optional().isDate().withMessage('Valid date of birth required (YYYY-MM-DD)'),
+  body('role').optional().isIn(['customer', 'admin']).withMessage('Invalid role')
+];
+
+// Validation middleware for login
+const validateLoginInput = [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required')
+];
+
+// Validation middleware for profile update
+const validateProfileInput = [
+  body('username').optional().isLength({ min: 3 }).withMessage('Username must be at least 3 characters'),
+  body('email').optional().isEmail().withMessage('Valid email is required'),
+  body('first_name').optional().isString(),
+  body('last_name').optional().isString(),
+  body('address').optional().isString(),
+  body('phone').optional().isString().matches(/^\+?\d{10,15}$/).withMessage('Phone must be 10-15 digits'),
+  body('date_of_birth').optional().isDate().withMessage('Valid date of birth required (YYYY-MM-DD)')
+];
+
+router.post('/register', validateRegisterInput, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: errors.array()[0].msg });
+  }
+
+  const { username, email, password, first_name, last_name, address, phone, date_of_birth, role } = req.body;
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    res.status(401).json({ message: 'Invalid token' });
-  }
-};
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'ecommerce'
+    });
 
-// Register endpoint
-router.post(
-  '/register',
-  upload.single('profile_picture'),
-  [
-    body('username').notEmpty().trim().isLength({ min: 3 }),
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 6 }),
-    body('first_name').optional().trim(),
-    body('last_name').optional().trim(),
-    body('address').optional().trim(),
-    body('phone').optional().trim(),
-    body('date_of_birth').optional().isDate(),
-    body('_csrf').notEmpty()
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
-      return res.status(400).json({ errors: errors.array() });
+    const [existingUser] = await connection.execute('SELECT * FROM users WHERE username = ? OR email = ?', [username, email]);
+    if (existingUser.length > 0) {
+      await connection.end();
+      return res.status(400).json({ message: 'Username or email already exists' });
     }
 
-    const { username, email, password, first_name, last_name, address, phone, date_of_birth } = req.body;
-    const profilePicture = req.file;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const [result] = await connection.execute(
+      'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+      [username, email, hashedPassword, role || 'customer']
+    );
 
-    try {
-      // Check for existing user
-      const [existingUser] = await pool.query('SELECT id FROM users WHERE email = ? OR username = ?', [email, username]);
-      if (existingUser.length > 0) {
-        if (profilePicture) {
-          fs.unlinkSync(profilePicture.path);
-        }
+    await connection.execute(
+      'INSERT INTO user_info (user_id, first_name, last_name, address, phone, date_of_birth) VALUES (?, ?, ?, ?, ?, ?)',
+      [result.insertId, first_name || null, last_name || null, address || null, phone || null, date_of_birth || null]
+    );
+
+    if (address || phone) {
+      await connection.execute(
+        'INSERT INTO user_addresses (user_id, title, address, phone, is_primary) VALUES (?, ?, ?, ?, ?)',
+        [result.insertId, 'Default', address || null, phone || null, 1]
+      );
+    }
+
+    await connection.end();
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/login', validateLoginInput, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: errors.array()[0].msg });
+  }
+
+  const { email, password } = req.body;
+
+  try {
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'ecommerce'
+    });
+
+    const [users] = await connection.execute('SELECT * FROM users WHERE email = ?', [email]);
+    if (users.length === 0) {
+      await connection.end();
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    const user = users[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      await connection.end();
+      return res.status(400).json({ message: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign({ id: user.id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    req.session.userId = user.id;
+
+    await connection.end();
+    res.json({ message: 'Login successful', token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/logout', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+
+  try {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destruction error:', err);
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: 'Logout successful' });
+    });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/me', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+
+  try {
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'ecommerce'
+    });
+
+    const [users] = await connection.execute('SELECT id, username, email, role FROM users WHERE id = ?', [req.session.userId]);
+    if (users.length === 0) {
+      await connection.end();
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await connection.end();
+    res.json({ user: users[0] });
+  } catch (err) {
+    console.error('Auth check error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/profile', async (req, res) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: 'Not authenticated' });
+  }
+
+  try {
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'ecommerce'
+    });
+
+    const [users] = await connection.execute(
+      'SELECT u.id, u.username, u.email, u.role, ui.first_name, ui.last_name, ui.date_of_birth, ui.profile_picture_url ' +
+      'FROM users u LEFT JOIN user_info ui ON u.id = ui.user_id WHERE u.id = ?',
+      [req.session.userId]
+    );
+
+    const [addresses] = await connection.execute(
+      'SELECT id, title, address, phone, is_primary FROM user_addresses WHERE user_id = ?',
+      [req.session.userId]
+    );
+
+    if (users.length === 0) {
+      await connection.end();
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const primaryAddress = addresses.find(addr => addr.is_primary) || addresses[0] || {};
+    await connection.end();
+    res.json({
+      user: {
+        ...users[0],
+        address: primaryAddress.address || null,
+        phone: primaryAddress.phone || null,
+        addresses
+      }
+    });
+  } catch (err) {
+    console.error('Profile fetch error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/profile', ensureUserId, upload.single('profile_picture'), validateProfileInput, async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ message: errors.array()[0].msg });
+  }
+
+  const { username, email, first_name, last_name, address, phone, date_of_birth } = req.body;
+
+  try {
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'ecommerce'
+    });
+
+    // Only check for username/email conflicts if they are provided
+    if (username || email) {
+      const [userCheck] = await connection.execute(
+        'SELECT * FROM users WHERE (username = ? OR email = ?) AND id != ?',
+        [username || '', email || '', req.session.userId]
+      );
+      if (userCheck.length > 0) {
+        await connection.end();
         return res.status(400).json({ message: 'Username or email already exists' });
       }
+    }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const connection = await pool.getConnection();
-      try {
-        await connection.beginTransaction();
+    // Update users table only if username or email is provided
+    if (username || email) {
+      await connection.execute(
+        'UPDATE users SET username = COALESCE(?, username), email = COALESCE(?, email) WHERE id = ?',
+        [username || null, email || null, req.session.userId]
+      );
+    }
 
-        // Insert into users table
-        const [userResult] = await connection.query(
-          'INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-          [username, email, hashedPassword]
+    let profilePictureUrl = null;
+    if (req.file) {
+      profilePictureUrl = `/users/${req.session.userId}/pfp/${req.file.filename}`;
+    }
+
+    const [existingInfo] = await connection.execute('SELECT * FROM user_info WHERE user_id = ?', [req.session.userId]);
+    if (existingInfo.length > 0) {
+      await connection.execute(
+        'UPDATE user_info SET first_name = COALESCE(?, first_name), last_name = COALESCE(?, last_name), date_of_birth = COALESCE(?, date_of_birth), profile_picture_url = COALESCE(?, profile_picture_url) WHERE user_id = ?',
+        [first_name || null, last_name || null, date_of_birth || null, profilePictureUrl, req.session.userId]
+      );
+    } else {
+      await connection.execute(
+        'INSERT INTO user_info (user_id, first_name, last_name, date_of_birth, profile_picture_url) VALUES (?, ?, ?, ?, ?)',
+        [req.session.userId, first_name || null, last_name || null, date_of_birth || null, profilePictureUrl]
+      );
+    }
+
+    // Update primary address if address or phone is provided
+    if (address || phone) {
+      const [primaryAddress] = await connection.execute(
+        'SELECT id FROM user_addresses WHERE user_id = ? AND is_primary = 1',
+        [req.session.userId]
+      );
+      if (primaryAddress.length > 0) {
+        await connection.execute(
+          'UPDATE user_addresses SET address = COALESCE(?, address), phone = COALESCE(?, phone) WHERE id = ?',
+          [address || null, phone || null, primaryAddress[0].id]
         );
-
-        const userId = userResult.insertId;
-
-        // Rename profile picture with userId
-        let profilePictureUrl = null;
-        if (profilePicture) {
-          const tempPath = profilePicture.path;
-          const ext = path.extname(profilePicture.originalname).toLowerCase();
-          const newPath = path.join(__dirname, '..', 'public', 'users', username, 'pfp', `${userId}_profile${ext}`);
-          fs.renameSync(tempPath, newPath);
-          profilePictureUrl = `/users/${username}/pfp/${userId}_profile${ext}`;
-        }
-
-        // Insert into user_info table
-        await connection.query(
-          'INSERT INTO user_info (user_id, first_name, last_name, address, phone, date_of_birth, profile_picture_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [
-            userId,
-            first_name || null,
-            last_name || null,
-            address || null,
-            phone || null,
-            date_of_birth || null,
-            profilePictureUrl
-          ]
+      } else {
+        await connection.execute(
+          'INSERT INTO user_addresses (user_id, title, address, phone, is_primary) VALUES (?, ?, ?, ?, ?)',
+          [req.session.userId, 'Default', address || null, phone || null, 1]
         );
-
-        // Generate JWT
-        const token = jwt.sign({ userId, username }, JWT_SECRET, { expiresIn: '24h' });
-        res.cookie('token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 24 * 60 * 60 * 1000
-        });
-
-        await connection.commit();
-        res.json({ user: { id: userId, username } });
-      } catch (err) {
-        await connection.rollback();
-        if (profilePicture) {
-          fs.unlinkSync(profilePicture.path);
-        }
-        throw err;
-      } finally {
-        connection.release();
       }
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  }
-);
-
-// Login endpoint
-router.post(
-  '/login',
-  [
-    body('email').isEmail().normalizeEmail(),
-    body('password').notEmpty(),
-    body('_csrf').notEmpty() // Add CSRF validation for login
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password } = req.body;
-
-    try {
-      const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-      if (rows.length === 0) {
-        return res.status(401).json({ message: 'Invalid email or password' });
-      }
-
-      const user = rows[0];
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-        return res.status(401).json({ message: 'Invalid email or password' });
-      }
-
-      const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000
-      });
-
-      res.json({ user: { id: user.id, username: user.username } });
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-  }
-);
-
-// Get current user
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT id, username FROM users WHERE id = ?', [req.user.userId]);
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json({ user: rows[0] });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// Get user profile
-router.get('/profile', authenticateToken, async (req, res) => {
-  try {
-    const [userRows] = await pool.query(
-      'SELECT u.id, u.username, u.email, ui.first_name, ui.last_name, ui.address, ui.phone, ui.date_of_birth, ui.profile_picture_url ' +
-      'FROM users u LEFT JOIN user_info ui ON u.id = ui.user_id WHERE u.id = ?',
-      [req.user.userId]
+    const [addresses] = await connection.execute(
+      'SELECT id, title, address, phone, is_primary FROM user_addresses WHERE user_id = ?',
+      [req.session.userId]
     );
-    if (userRows.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    res.json({ user: userRows[0] });
+
+    const [updatedUser] = await connection.execute(
+      'SELECT u.id, u.username, u.email, u.role, ui.first_name, ui.last_name, ui.date_of_birth, ui.profile_picture_url ' +
+      'FROM users u LEFT JOIN user_info ui ON u.id = ui.user_id WHERE u.id = ?',
+      [req.session.userId]
+    );
+
+    await connection.end();
+    res.json({
+      message: 'Profile updated successfully',
+      user: {
+        ...updatedUser[0],
+        address: addresses.find(addr => addr.is_primary)?.address || addresses[0]?.address || null,
+        phone: addresses.find(addr => addr.is_primary)?.phone || addresses[0]?.phone || null,
+        addresses
+      }
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Profile update error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Update user profile
-router.put(
-  '/profile',
-  authenticateToken,
-  upload.single('profile_picture'),
-  [
-    body('email').optional().isEmail().normalizeEmail(),
-    body('username').optional().trim().isLength({ min: 3 }),
-    body('first_name').optional().trim(),
-    body('last_name').optional().trim(),
-    body('address').optional().trim(),
-    body('phone').optional().trim(),
-    body('date_of_birth').optional().isDate(),
-    body('_csrf').notEmpty()
-  ],
-  async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { email, username, first_name, last_name, address, phone, date_of_birth } = req.body;
-    const profilePicture = req.file;
-    const userId = req.user.userId;
-
-    try {
-      const connection = await pool.getConnection();
-      try {
-        await connection.beginTransaction();
-
-        // Update users table if email or username is provided
-        if (email || username) {
-          const updates = {};
-          if (email) updates.email = email;
-          if (username) updates.username = username;
-          
-          // Check for existing username or email
-          if (username || email) {
-            const [existingUser] = await connection.query(
-              'SELECT id FROM users WHERE (username = ? OR email = ?) AND id != ?',
-              [username || '', email || '', userId]
-            );
-            if (existingUser.length > 0) {
-              if (profilePicture) {
-                fs.unlinkSync(profilePicture.path);
-              }
-              await connection.rollback();
-              return res.status(400).json({ message: 'Username or email already exists' });
-            }
-          }
-
-          // Update users table
-          const updateFields = Object.keys(updates);
-          if (updateFields.length > 0) {
-            const setClause = updateFields.map(field => `${field} = ?`).join(', ');
-            await connection.query(
-              `UPDATE users SET ${setClause} WHERE id = ?`,
-              [...Object.values(updates), userId]
-            );
-          }
-        }
-
-        // Handle profile picture update
-        let profilePictureUrl = null;
-        if (profilePicture) {
-          const ext = path.extname(profilePicture.originalname).toLowerCase();
-          profilePictureUrl = `/users/${req.user.username}/pfp/${userId}_profile${ext}`;
-        }
-
-        // Update user_info table
-        const userInfoUpdates = {
-          first_name: first_name || null,
-          last_name: last_name || null,
-          address: address || null,
-          phone: phone || null,
-          date_of_birth: date_of_birth || null,
-          profile_picture_url: profilePictureUrl
-        };
-        const updateInfoFields = Object.keys(userInfoUpdates).filter(key => userInfoUpdates[key] !== undefined);
-        if (updateInfoFields.length > 0) {
-          const setClause = updateInfoFields.map(field => `${field} = ?`).join(', ');
-          await connection.query(
-            `INSERT INTO user_info (user_id, ${updateInfoFields.join(', ')}) VALUES (?, ${updateInfoFields.map(() => '?').join(', ')}) ` +
-            `ON DUPLICATE KEY UPDATE ${setClause}`,
-            [userId, ...updateInfoFields.map(key => userInfoUpdates[key]), ...updateInfoFields.map(key => userInfoUpdates[key])]
-          );
-        }
-
-        await connection.commit();
-
-        // Fetch updated user data
-        const [updatedUser] = await pool.query(
-          'SELECT u.id, u.username, u.email, ui.first_name, ui.last_name, ui.address, ui.phone, ui.date_of_birth, ui.profile_picture_url ' +
-          'FROM users u LEFT JOIN user_info ui ON u.id = ui.user_id WHERE u.id = ?',
-          [userId]
-        );
-
-        res.json({ user: updatedUser[0], message: 'Profile updated successfully' });
-      } catch (err) {
-        await connection.rollback();
-        if (profilePicture) {
-          fs.unlinkSync(profilePicture.path);
-        }
-        throw err;
-      } finally {
-        connection.release();
-      }
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
+router.post('/address', ensureUserId, async (req, res) => {
+  const { title, address, phone } = req.body;
+  if (!title) {
+    return res.status(400).json({ message: 'Address title is required' });
   }
-);
 
-// Logout
-router.post('/logout', (req, res) => {
-  res.clearCookie('token');
-  res.json({ message: 'Logged out successfully' });
+  try {
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'ecommerce'
+    });
+
+    // Check address limit
+    const [existingAddresses] = await connection.execute(
+      'SELECT COUNT(*) as count FROM user_addresses WHERE user_id = ?',
+      [req.session.userId]
+    );
+    if (existingAddresses[0].count >= 5) {
+      await connection.end();
+      return res.status(400).json({ message: 'Maximum 5 addresses allowed' });
+    }
+
+    await connection.execute(
+      'INSERT INTO user_addresses (user_id, title, address, phone, is_primary) VALUES (?, ?, ?, ?, ?)',
+      [req.session.userId, title, address || null, phone || null, 0]
+    );
+
+    await connection.end();
+    res.json({ message: 'Address added successfully' });
+  } catch (err) {
+    console.error('Address add error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/address/primary', ensureUserId, async (req, res) => {
+  const { address_id } = req.body;
+  if (!address_id) {
+    return res.status(400).json({ message: 'Address ID is required' });
+  }
+
+  try {
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      user: 'root',
+      password: '',
+      database: 'ecommerce'
+    });
+
+    await connection.execute(
+      'UPDATE user_addresses SET is_primary = 0 WHERE user_id = ?',
+      [req.session.userId]
+    );
+
+    await connection.execute(
+      'UPDATE user_addresses SET is_primary = 1 WHERE id = ? AND user_id = ?',
+      [address_id, req.session.userId]
+    );
+
+    await connection.end();
+    res.json({ message: 'Primary address updated successfully' });
+  } catch (err) {
+    console.error('Primary address update error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 export default router;

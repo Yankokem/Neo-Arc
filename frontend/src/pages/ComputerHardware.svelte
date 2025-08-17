@@ -73,18 +73,18 @@
         {:else}
             <div class="product-counter flex flex-row justify-end items-center gap-4 mb-4">
                 <div class="flex items-center gap-2">
-                    <span class="text-base">Sort by:</span>
+                    <span class="text-base text-gray-500 font-semibold">Sort by:</span>
                     <select
                         bind:value={sortOption}
                         on:change={handleSortChange}
-                        class="rounded-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-[#000000]"
+                        class="text-gray-500 font-semibold rounded-sm py-1 px-2 focus:outline-none focus:ring-2 focus:ring-[#9E9E9E]"
                     >
                         {#each sortOptions as option}
                             <option value={option.value}>{option.label}</option>
                         {/each}
                     </select>
                 </div>
-                <h1 class="text-base">{products.length} Products</h1>
+                <h1 class="text-base text-gray-500 font-semibold">{products.length} Products</h1>
             </div>
             <div class="grid grid-cols-3 gap-2">
                 {#each products as product}
